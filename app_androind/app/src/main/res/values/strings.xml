@@ -1,0 +1,11 @@
+<resources>
+    <string name="app_name">Crypto Monitor</string>
+    <string name="widget_name">กราฟคริปโต</string>
+    <string name="widget_description">กราฟ XRP หรือ BTC จาก Binance พร้อม SMA 5 และ SMA 200</string>
+    <string name="loading">กำลังโหลด…</string>
+    <string name="load_failed">เชื่อมต่อ Binance ไม่สำเร็จ</string>
+    <string name="home_hint">กดค้างที่หน้าโฮม เลือกวิดเจ็ต แล้วเพิ่ม กราฟคริปโต ได้ทั้ง XRP และ BTC แตะวิดเจ็ตเพื่ออัปเดตราคา</string>
+    <string name="choose_symbol">เหรียญ</string>
+    <string name="choose_interval">ไทม์เฟรม</string>
+    <string name="save_widget">บันทึก</string>
+</resources>

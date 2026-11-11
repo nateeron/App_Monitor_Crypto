@@ -1,0 +1,2 @@
+-keep class crypto.monitor.widgets.RefreshWorker { <init>(android.content.Context, androidx.work.WorkerParameters); }
+-keep class crypto.monitor.widgets.CryptoWidgetProvider { *; }
