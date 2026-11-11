@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' wss://stream.binance.com:9443 wss://stream.binance.com wss://data-stream.binance.vision">
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Crypto Monitor</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header id="header">
+    <div class="title">
+      <span id="accent" class="accent"></span>
+      <span id="symbol">—</span>
+      <span class="quote">
+        <span id="price">—</span>
+        <span id="change"></span>
+      </span>
+    </div>
+    <button id="tfBtn" type="button" title="ไทม์เฟรม">15m</button>
+    <span id="status" class="dot" title="กำลังเชื่อมต่อ"></span>
+    <div class="win-btns">
+      <button id="minBtn" type="button" title="ย่อ">–</button>
+      <button id="closeBtn" type="button" title="ซ่อน">×</button>
+    </div>
+  </header>
+  <div id="chartWrap">
+    <div id="chart"></div>
+    <div id="legend">
+      <span id="leg5">SMA 5</span>
+      <span id="leg200">SMA 200</span>
+    </div>
+    <div id="measure" hidden>
+      <div id="measureBox"></div>
+      <div id="measureLabel"></div>
+    </div>
+    <div id="overlay">
+      <p id="overlayText">กำลังโหลด…</p>
+      <button id="retryBtn" type="button" hidden>ลองใหม่</button>
+    </div>
+  </div>
+  <div id="menu" class="menu" hidden></div>
+  <script src="indicators.js"></script>
+  <script src="lightweight-charts.standalone.js"></script>
+  <script src="renderer.js"></script>
+</body>
+</html>

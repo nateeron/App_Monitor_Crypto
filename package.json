@@ -1,0 +1,16 @@
+{
+  "name": "crypto-chart-monitor",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Mini Binance chart monitor for XRPUSDT and BTCUSDT",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron ."
+  },
+  "dependencies": {
+    "lightweight-charts": "^5.0.9"
+  },
+  "devDependencies": {
+    "electron": "^33.4.11"
+  }
+}
