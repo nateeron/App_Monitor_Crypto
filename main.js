@@ -399,8 +399,14 @@ function revealWhenReady() {
   broadcastPanels();
 }
 
-async function fetchKlines(symbol, interval, limit) {
-  const query = `/api/v3/klines?symbol=${symbol}&interval=${interval}&limit=${limit}`;
+async function fetchKlines(symbol, interval, limit, endTime) {
+  const params = new URLSearchParams({
+    symbol,
+    interval,
+    limit: String(limit),
+  });
+  if (endTime != null) params.set('endTime', String(endTime));
+  const query = `/api/v3/klines?${params.toString()}`;
   let lastError = null;
   for (const host of BINANCE_HOSTS) {
     const controller = new AbortController();
@@ -560,7 +566,12 @@ function registerIpc() {
     const limit = clamp(Math.round(Number(params.limit) || 699), 1, 1000);
     if (symbol !== entry.symbol) throw new Error('symbol mismatch');
     if (!INTERVALS.includes(interval)) throw new Error('bad interval');
-    return fetchKlines(symbol, interval, limit);
+    let endTime = null;
+    if (params.endTime != null && params.endTime !== '') {
+      endTime = Math.round(Number(params.endTime));
+      if (!Number.isFinite(endTime) || endTime < 0) throw new Error('bad endTime');
+    }
+    return fetchKlines(symbol, interval, limit, endTime);
   });
 }
 

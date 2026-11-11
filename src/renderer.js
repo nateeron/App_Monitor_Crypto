@@ -1,5 +1,4 @@
 const {
-  VISIBLE_BARS,
   FETCH_LIMIT,
   computeSma,
   lastSma,
@@ -22,6 +21,8 @@ const TIMEFRAMES = [
 
 const SIZES = [250, 300, 400, 500];
 const LATEST_BARS = 20;
+const HISTORY_PAGE = 1000;
+const HISTORY_EDGE = 40;
 const ACCENTS = { BTCUSDT: '#F7941A', XRPUSDT: '#00aae4' };
 
 const symbolEl = document.getElementById('symbol');
@@ -49,6 +50,8 @@ const state = {
   history: [],
   dayOpen: null,
   chartReady: false,
+  historyLoading: false,
+  historyDone: false,
   loadId: 0,
   socketGen: 0,
 };
@@ -158,6 +161,11 @@ function buildChart() {
     handleScale: true,
   });
 
+  chart.timeScale().subscribeVisibleLogicalRangeChange((range) => {
+    if (!range || !state.chartReady || state.historyLoading || state.historyDone) return;
+    if (range.from < HISTORY_EDGE) loadOlder();
+  });
+
   candleSeries = createSeries(lib.CandlestickSeries, {
     upColor: '#26a69a',
     downColor: '#ef5350',
@@ -203,7 +211,7 @@ function buildChart() {
 }
 
 function visibleBars() {
-  return state.history.slice(-VISIBLE_BARS);
+  return state.history;
 }
 
 function pushSeries(fit) {
@@ -213,8 +221,8 @@ function pushSeries(fit) {
   candleSeries.setData(view);
   sma5Series.setData(computeSma(state.history, 5).filter((point) => point.time >= start));
   sma200Series.setData(computeSma(state.history, 200).filter((point) => point.time >= start));
-  state.chartReady = true;
   if (fit) showLatestBars();
+  state.chartReady = true;
   updateReadout();
 }
 
@@ -310,18 +318,46 @@ function applyBar(bar) {
     return;
   }
 
-  const range = chart.timeScale().getVisibleLogicalRange();
-  const atEnd = !range || range.to >= VISIBLE_BARS - 2;
   state.history.push(bar);
-  if (state.history.length > FETCH_LIMIT) {
-    state.history.splice(0, state.history.length - FETCH_LIMIT);
-  }
-  pushSeries(false);
-  if (range) {
-    chart.timeScale().setVisibleLogicalRange(atEnd ? range : {
-      from: range.from - 1,
-      to: range.to - 1,
+  candleSeries.update(bar);
+  const sma5 = lastSma(state.history, 5);
+  const sma200 = lastSma(state.history, 200);
+  if (sma5) sma5Series.update(sma5);
+  if (sma200) sma200Series.update(sma200);
+  updateReadout();
+}
+
+async function loadOlder() {
+  if (state.historyLoading || state.historyDone || !state.history.length) return;
+  const generation = state.loadId;
+  const interval = state.interval;
+  const firstTime = state.history[0].time;
+  state.historyLoading = true;
+  try {
+    const raw = await window.monitor.fetchKlines({
+      symbol: state.symbol,
+      interval,
+      limit: HISTORY_PAGE,
+      endTime: firstTime * 1000 - 1,
     });
+    if (generation !== state.loadId || interval !== state.interval) return;
+    const older = parseKlines(raw).filter((bar) => bar.time < firstTime);
+    if (older.length < HISTORY_PAGE) state.historyDone = true;
+    if (!older.length) return;
+    const range = chart.timeScale().getVisibleLogicalRange();
+    state.history = older.concat(state.history);
+    pushSeries(false);
+    if (range) {
+      chart.timeScale().setVisibleLogicalRange({
+        from: range.from + older.length,
+        to: range.to + older.length,
+      });
+    }
+  } catch (error) {
+    if (generation !== state.loadId) return;
+    console.error(error);
+  } finally {
+    if (generation === state.loadId) state.historyLoading = false;
   }
 }
 
@@ -388,6 +424,8 @@ async function load(interval) {
   state.loadId += 1;
   const generation = state.loadId;
   state.interval = interval;
+  state.historyLoading = false;
+  state.historyDone = false;
   tfBtn.textContent = interval;
   document.title = `${prettySymbol(state.symbol)} · ${interval}`;
   showOverlay('กำลังโหลด…', false);
