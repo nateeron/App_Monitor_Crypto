@@ -175,6 +175,33 @@ function entryFromEvent(event) {
   return null;
 }
 
+function readAppIcon() {
+  const image = nativeImage.createFromPath(path.join(__dirname, 'icon.png'));
+  return image.isEmpty() ? null : image;
+}
+
+function windowIconPath() {
+  const pngPath = path.join(__dirname, 'icon.png');
+  try {
+    const png = fs.readFileSync(pngPath);
+    const header = Buffer.alloc(6);
+    header.writeUInt16LE(0, 0);
+    header.writeUInt16LE(1, 2);
+    header.writeUInt16LE(1, 4);
+    const entry = Buffer.alloc(16);
+    entry.writeUInt16LE(1, 4);
+    entry.writeUInt16LE(32, 6);
+    entry.writeUInt32LE(png.length, 8);
+    entry.writeUInt32LE(22, 12);
+    const icoPath = path.join(app.getPath('userData'), 'app-icon.ico');
+    fs.writeFileSync(icoPath, Buffer.concat([header, entry, png]));
+    return icoPath;
+  } catch (error) {
+    console.error('app icon failed', error);
+    return pngPath;
+  }
+}
+
 function createChartWindow(symbol, saved) {
   const state = normalizeState(saved);
   if (!state.independent) {
@@ -201,6 +228,7 @@ function createChartWindow(symbol, saved) {
     hasShadow: true,
     backgroundColor: '#0b0e11',
     title: symbol,
+    icon: windowIconPath(),
     alwaysOnTop: state.alwaysOnTop,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
@@ -312,6 +340,8 @@ function refreshTray() {
 }
 
 function createTrayIcon() {
+  const image = readAppIcon();
+  if (image) return image.resize({ width: 32, height: 32, quality: 'best' });
   const size = 16;
   const pixels = Buffer.alloc(size * size * 4);
   for (let y = 0; y < size; y += 1) {
