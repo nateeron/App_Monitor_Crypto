@@ -5,12 +5,37 @@
   "description": "Mini Binance chart monitor for XRPUSDT and BTCUSDT",
   "main": "main.js",
   "scripts": {
-    "start": "electron ."
+    "start": "electron .",
+    "build": "electron scripts/make-icon.js && electron-builder --win portable"
   },
   "dependencies": {
     "lightweight-charts": "^5.0.9"
   },
   "devDependencies": {
-    "electron": "^33.4.11"
+    "electron": "^33.4.11",
+    "electron-builder": "^26.18.0"
+  },
+  "build": {
+    "appId": "crypto.monitor.charts",
+    "productName": "Crypto Chart Monitor",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "icon.png",
+      "src/**/*",
+      "package.json"
+    ],
+    "win": {
+      "executableName": "CryptoChartMonitor",
+      "icon": "build/icon.png",
+      "target": "portable",
+      "signAndEditExecutable": true
+    },
+    "portable": {
+      "artifactName": "CryptoChartMonitor.exe"
+    }
   }
 }
