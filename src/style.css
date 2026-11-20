@@ -319,3 +319,26 @@ body.independent #header {
   justify-content: center;
   padding: 4px 8px;
 }
+
+.size-form input[type="text"] {
+  width: 112px;
+  text-transform: uppercase;
+}
+
+.choice-row {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+}
+
+.choice-row button {
+  flex: 1;
+  justify-content: center;
+}
+
+.menu-note {
+  min-height: 16px;
+  padding: 0 8px 6px;
+  color: var(--down);
+  font-size: 11px;
+}

@@ -41,7 +41,10 @@ const leg5 = document.getElementById('leg5');
 const leg200 = document.getElementById('leg200');
 
 const state = {
+  id: '',
   symbol: '',
+  source: 'binance',
+  label: '',
   interval: '15m',
   independent: false,
   alwaysOnTop: true,
@@ -69,6 +72,16 @@ function prettySymbol(symbol) {
   return symbol;
 }
 
+function accentFor(symbol, source) {
+  if (symbol === 'BTCUSDT') return '#F7941A';
+  if (symbol === 'XRPUSDT') return '#00AAE4';
+  if (source === 'yahoo' && (symbol === 'GC=F' || symbol === 'GLD')) return '#F5C542';
+  const palette = ['#7C5CFF', '#00C2A8', '#FF6B6B', '#4C8DFF', '#E6A23C'];
+  let hash = 0;
+  for (const char of String(symbol)) hash = (hash + char.charCodeAt(0)) % palette.length;
+  return palette[hash];
+}
+
 function formatBangkok(time, tickMarkType) {
   const date = new Date(time * 1000);
   const base = { timeZone: 'Asia/Bangkok', hour12: false };
@@ -85,7 +98,9 @@ function formatBangkok(time, tickMarkType) {
 
 function setOnline(online) {
   statusEl.classList.toggle('on', online);
-  statusEl.title = online ? 'เชื่อมต่อ Binance แล้ว' : 'ไม่ได้เชื่อมต่อ';
+  statusEl.title = online
+    ? (state.source === 'yahoo' ? 'ข้อมูลพร้อม' : 'เชื่อมต่อ Binance แล้ว')
+    : 'ไม่ได้เชื่อมต่อ';
 }
 
 function showOverlay(text, canRetry) {
@@ -101,6 +116,9 @@ function hideOverlay() {
 function applyWindowState(next) {
   state.independent = Boolean(next.independent);
   state.alwaysOnTop = next.alwaysOnTop !== false;
+  if (next.source) state.source = next.source;
+  if (next.id) state.id = next.id;
+  if (next.label) state.label = next.label;
   if (next.headerHeight) state.headerHeight = next.headerHeight;
   document.body.classList.toggle('independent', state.independent);
   document.getElementById('header').title = state.independent
@@ -362,6 +380,11 @@ async function loadOlder() {
 }
 
 function connectSocket() {
+  if (state.source !== 'binance') {
+    stopSocket();
+    setOnline(true);
+    return;
+  }
   stopSocket();
   openSocket(state.socketGen, 0);
 }
@@ -427,7 +450,7 @@ async function load(interval) {
   state.historyLoading = false;
   state.historyDone = false;
   tfBtn.textContent = interval;
-  document.title = `${prettySymbol(state.symbol)} · ${interval}`;
+  document.title = `${state.label || prettySymbol(state.symbol)} · ${interval}`;
   showOverlay('กำลังโหลด…', false);
   state.chartReady = false;
   stopSocket();
@@ -458,7 +481,7 @@ async function load(interval) {
     if (generation !== state.loadId) return;
     console.error(error);
     setOnline(false);
-    showOverlay('เชื่อมต่อ Binance ไม่สำเร็จ', true);
+    showOverlay('โหลดข้อมูลไม่สำเร็จ', true);
   }
 }
 
@@ -504,6 +527,7 @@ function showMenu(panel) {
   menu.replaceChildren();
   if (panel === 'time') renderTimePanel();
   else if (panel === 'size') renderSizePanel();
+  else if (panel === 'add') renderAddPanel();
   else renderRootPanel();
   menu.hidden = false;
   menu.style.maxHeight = `${Math.max(120, window.innerHeight - 8)}px`;
@@ -538,17 +562,25 @@ function renderRootPanel() {
     window.monitor.setAlwaysOnTop(!state.alwaysOnTop);
   }));
   menu.append(separator());
+  menu.append(menuRow('เพิ่มรายการเฝ้าดู', false, () => showMenu('add'), '', '›'));
   menu.append(menuCaption('เปิดปิดหน้าต่าง'));
   panels.forEach((panel) => {
     menu.append(menuRow(`หน้าต่าง ${panel.label}`, panel.open, async () => {
-      const hideSelf = panel.symbol === state.symbol && panel.open;
-      const nextPanels = await window.monitor.setWindowOpen(panel.symbol, !panel.open);
+      const hideSelf = panel.id === state.id && panel.open;
+      const nextPanels = await window.monitor.setWindowOpen(panel.id, !panel.open);
       if (Array.isArray(nextPanels)) panels = nextPanels;
       if (hideSelf) closeMenu();
       else showMenu('root');
     }));
   });
   menu.append(separator());
+  if (panels.length > 1) {
+    menu.append(menuRow('เอารายการนี้ออก', false, async () => {
+      closeMenu();
+      const nextPanels = await window.monitor.removeWatch();
+      if (Array.isArray(nextPanels)) panels = nextPanels;
+    }));
+  }
   menu.append(menuRow('ย่อ', false, () => {
     closeMenu();
     window.monitor.minimize();
@@ -584,30 +616,117 @@ function renderSizePanel() {
       sizeIsActive(size),
       () => {
         closeMenu();
-        window.monitor.setChartSize(size);
+        window.monitor.setChartSize({ width: size, height: size });
       },
       sizeIsActive(size) ? 'active-choice' : '',
     ));
   });
   const form = document.createElement('form');
   form.className = 'size-form';
-  const input = document.createElement('input');
-  input.type = 'number';
-  input.min = '200';
-  input.max = '900';
-  input.step = '10';
-  input.value = String(Math.round(window.innerWidth));
+  const widthInput = document.createElement('input');
+  widthInput.type = 'number';
+  widthInput.min = '200';
+  widthInput.max = '1600';
+  widthInput.step = '10';
+  widthInput.title = 'ความกว้าง';
+  widthInput.value = String(Math.round(window.innerWidth));
+  const heightInput = document.createElement('input');
+  heightInput.type = 'number';
+  heightInput.min = '200';
+  heightInput.max = '900';
+  heightInput.step = '10';
+  heightInput.title = 'ความสูง';
+  heightInput.value = String(Math.max(200, Math.round(window.innerHeight - state.headerHeight)));
   const apply = document.createElement('button');
   apply.type = 'submit';
   apply.textContent = 'ใช้';
-  form.append(input, apply);
+  form.append(widthInput, heightInput, apply);
   form.addEventListener('submit', (event) => {
     event.preventDefault();
-    const next = Number(input.value);
-    if (Number.isFinite(next)) window.monitor.setChartSize(next);
+    const width = Number(widthInput.value);
+    const height = Number(heightInput.value);
+    if (Number.isFinite(width) && Number.isFinite(height)) {
+      window.monitor.setChartSize({ width, height });
+    }
     closeMenu();
   });
   menu.append(form);
+}
+
+function renderAddPanel() {
+  menu.append(backRow('เพิ่มรายการเฝ้าดู'));
+  menu.append(separator());
+  let source = 'binance';
+  const choices = document.createElement('div');
+  choices.className = 'choice-row';
+  const modes = [
+    { id: 'binance', label: 'คริปโต' },
+    { id: 'yahoo', label: 'หุ้น' },
+    { id: 'gold', label: 'ทอง' },
+  ];
+  const buttons = modes.map((mode) => {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.textContent = mode.label;
+    button.addEventListener('click', () => {
+      source = mode.id;
+      buttons.forEach((item) => item.classList.toggle('active-choice', item === button));
+      input.placeholder = mode.id === 'yahoo' ? 'AAPL' : (mode.id === 'gold' ? 'GC=F' : 'SOL');
+      if (mode.id === 'gold' && !input.value) input.value = 'GC=F';
+      if (mode.id !== 'gold' && input.value === 'GC=F') input.value = '';
+    });
+    return button;
+  });
+  buttons[0].classList.add('active-choice');
+  choices.append(...buttons);
+  menu.append(choices);
+  const goldRow = document.createElement('div');
+  goldRow.className = 'choice-row';
+  [
+    { label: 'ทอง', source: 'yahoo', symbol: 'GC=F', name: 'ทอง' },
+    { label: 'GLD', source: 'yahoo', symbol: 'GLD', name: 'GLD' },
+    { label: 'PAXG', source: 'binance', symbol: 'PAXG', name: 'PAXG' },
+  ].forEach((preset) => {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.textContent = preset.label;
+    button.addEventListener('click', () => submitWatch(preset));
+    goldRow.append(button);
+  });
+  menu.append(goldRow);
+  const form = document.createElement('form');
+  form.className = 'size-form';
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.maxLength = 16;
+  input.placeholder = 'SOL';
+  input.spellcheck = false;
+  const apply = document.createElement('button');
+  apply.type = 'submit';
+  apply.textContent = 'เพิ่ม';
+  form.append(input, apply);
+  const note = document.createElement('div');
+  note.className = 'menu-note';
+  form.addEventListener('submit', (event) => {
+    event.preventDefault();
+    const payload = source === 'gold'
+      ? { source: 'yahoo', symbol: input.value || 'GC=F', label: input.value && input.value.toUpperCase() !== 'GC=F' ? input.value.toUpperCase() : 'ทอง' }
+      : { source, symbol: input.value };
+    submitWatch(payload, note);
+  });
+  menu.append(form, note);
+
+  async function submitWatch(payload, target) {
+    try {
+      const nextPanels = await window.monitor.addWatch(payload);
+      if (Array.isArray(nextPanels)) panels = nextPanels;
+      closeMenu();
+    } catch (error) {
+      if (target) target.textContent = 'ไม่พบสัญลักษณ์นี้';
+      else note.textContent = 'ไม่พบสัญลักษณ์นี้';
+      console.error(error);
+    }
+  }
 }
 
 function openMenu(x, y) {
@@ -813,12 +932,15 @@ async function main() {
     return;
   }
   state.symbol = saved.symbol;
+  state.source = saved.source || 'binance';
+  state.id = saved.id || `${state.source}:${saved.symbol}`;
+  state.label = saved.label || prettySymbol(saved.symbol);
   state.interval = saved.interval || '15m';
   const loadedPanels = await window.monitor.getPanels();
   if (Array.isArray(loadedPanels)) panels = loadedPanels;
   applyWindowState(saved);
-  symbolEl.textContent = prettySymbol(state.symbol);
-  accentEl.style.background = ACCENTS[state.symbol] || '#8b97a8';
+  symbolEl.textContent = state.label;
+  accentEl.style.background = accentFor(state.symbol, state.source);
   document.body.dataset.symbol = state.symbol;
   tfBtn.textContent = state.interval;
   buildChart();
